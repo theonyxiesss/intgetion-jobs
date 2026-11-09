@@ -73,3 +73,5 @@ Reads (never writes): `companies` and `company_members` (companies), `skills` (t
 - `./server` — `createApp()` HTTP handler
 
 Depends on `@intgetion/kit` (v0.3.1), `@intgetion/taxonomy` (v0.3.0, marker vocabulary) and `@intgetion/companies` (v0.1.1, company marks and free-email rules) by git tag.
+
+`./db` — table definitions (Drizzle) for read-only use by other modules.

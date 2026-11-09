@@ -1,6 +1,6 @@
 {
   "name": "@intgetion/jobs",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Jobs for INTGETION JOB LIST: job lifecycle, drafts, status machine, risk score, skills and languages, imported jobs, FX rates, public search, related jobs and feeds.",
   "license": "UNLICENSED",
   "type": "module",
@@ -8,7 +8,8 @@
     ".": "./src/modules/jobs/service/index.ts",
     "./schemas": "./src/modules/jobs/schemas/index.ts",
     "./ports": "./src/ports.ts",
-    "./server": "./src/server/app.ts"
+    "./server": "./src/server/app.ts",
+    "./db": "./src/db/owned.ts"
   },
   "scripts": {
     "dev": "tsx watch src/server/main.ts",
