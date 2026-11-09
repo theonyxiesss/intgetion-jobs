@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS public.users (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   auth_uid uuid UNIQUE,
   terms_accepted_at timestamptz,
-  terms_version text
+  terms_version text,
+  created_at timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS public.user_profiles (

@@ -113,8 +113,13 @@ function parseSearch(raw: Record<string, unknown>) {
 }
 
 async function runSearch(query: ReturnType<typeof parseSearch>, lang: string, viewer: Parameters<typeof jobs.searchJobs>[2]) {
+  const started = performance.now();
   try {
-    return await jobs.searchJobs(query, lang, viewer);
+    const result = await jobs.searchJobs(query, lang, viewer);
+    const serverMs = performance.now() - started;
+    return Response.json(result, {
+      headers: { "cache-control": "no-store", "server-timing": `jobs;dur=${serverMs.toFixed(1)}` },
+    });
   } catch (error) {
     if (error instanceof Error && error.message === "invalid_cursor") {
       throw new HttpError(400, "VALIDATION_ERROR", "Invalid page cursor");
