@@ -52,8 +52,8 @@ beforeAll(async () => {
   `);
   await db.execute(sql`
     insert into public.skills (id, slug, name_en, name_ru, category, is_active)
-    values (${skillA}, ${`ls-a-${tag}`}, 'LS A', 'LS A', 'other', true),
-           (${skillB}, ${`ls-b-${tag}`}, 'LS B', 'LS B', 'other', true)
+    values (${skillA}, ${`ls-a-${tag}`}, 'LS A', 'LS A', 'engineering', true),
+           (${skillB}, ${`ls-b-${tag}`}, 'LS B', 'LS B', 'engineering', true)
   `);
 });
 
