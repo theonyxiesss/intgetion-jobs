@@ -18,7 +18,7 @@ let jobId: string | undefined;
 const base: ImportedJobWrite = {
   companyId,
   title: "Light Save Engineer",
-  description: "Original description.",
+  description: "Original description of the light save integration job.",
   category: "engineering" as ImportedJobWrite["category"],
   employmentType: "full_time" as ImportedJobWrite["employmentType"],
   timeZone: null,
@@ -82,12 +82,12 @@ describe("saveImportedJob light save", () => {
 
   it("writes when the description changes by one character", async () => {
     const before = await snapshot();
-    await saveImportedJob({ ...base, jobId, description: "Original description!" });
+    await saveImportedJob({ ...base, jobId, description: "Original description of the light save integration job!" });
     expect((await snapshot()).updatedAt).not.toBe(before.updatedAt);
   });
 
   it("writes when only the skill set changes", async () => {
-    const description = "Original description!";
+    const description = "Original description of the light save integration job!";
     const before = await snapshot();
     await saveImportedJob({ ...base, jobId, description, skillIds: [skillA, skillB] });
     expect((await snapshot()).updatedAt).not.toBe(before.updatedAt);
