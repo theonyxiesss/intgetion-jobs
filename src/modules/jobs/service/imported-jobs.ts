@@ -1,4 +1,5 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { createHash } from "node:crypto";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   isSensitiveSector,
   type Perk,
@@ -89,15 +90,67 @@ export function importedPlace(input: {
       };
 }
 
+/** Columns read back from an existing job: never description or fts, which
+ * are most of a row (Supabase egress quota). The description is compared by
+ * its md5. */
+const previousColumns = {
+  id: jobs.id,
+  source: jobs.source,
+  status: jobs.status,
+  publishedAt: jobs.publishedAt,
+  companyId: jobs.companyId,
+  title: jobs.title,
+  descriptionMd5: sql<string>`md5(${jobs.description})`,
+  category: jobs.category,
+  employmentType: jobs.employmentType,
+  sectors: jobs.sectors,
+  seniority: jobs.seniority,
+  perks: jobs.perks,
+  workFormat: jobs.workFormat,
+  location: jobs.location,
+  locationCountry: jobs.locationCountry,
+  countryRestrictions: jobs.countryRestrictions,
+  timezoneRequired: jobs.timezoneRequired,
+  applicationUrl: jobs.applicationUrl,
+  expiresAt: jobs.expiresAt,
+  riskScore: jobs.riskScore,
+  riskFlags: jobs.riskFlags,
+};
+
+const md5 = (text: string) =>
+  createHash("md5").update(text, "utf8").digest("hex");
+
+function same(a: unknown, b: unknown): boolean {
+  if (a instanceof Date || b instanceof Date) {
+    return (
+      a instanceof Date && b instanceof Date && a.getTime() === b.getTime()
+    );
+  }
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  }
+  return (a ?? null) === (b ?? null);
+}
+
+export type SavedImportedJob = { id: string; status: JobStatus };
+
 /**
  * Writes normalized ingestion output (8A). Only imported jobs: an internal
  * job is never overwritten, and employers cannot edit these (D9). A job a
- * person removed, closed or paused is left untouched (D412).
+ * person removed, closed or paused is left untouched (D412). A job whose
+ * content, status and skills did not change is not rewritten: feeds repeat
+ * the same records every run.
  */
-export async function saveImportedJob(input: ImportedJobWrite) {
+export async function saveImportedJob(
+  input: ImportedJobWrite,
+): Promise<SavedImportedJob> {
   return getDb().transaction(async (tx) => {
     const [previous] = input.jobId
-      ? await tx.select().from(jobs).where(eq(jobs.id, input.jobId)).limit(1)
+      ? await tx
+          .select(previousColumns)
+          .from(jobs)
+          .where(eq(jobs.id, input.jobId))
+          .limit(1)
       : [];
     if (previous && previous.source !== "imported") {
       throw new Error("Imported jobs cannot overwrite an internal job");
@@ -107,14 +160,15 @@ export async function saveImportedJob(input: ImportedJobWrite) {
       next: input.status,
       sensitive: isSensitiveSector(input.sectors ?? []),
     });
-    if (previous && status === null) return previous;
+    if (previous && status === null) {
+      return { id: previous.id, status: previous.status };
+    }
     if (status === null) throw new Error("A new imported job needs a status");
     const now = new Date();
     const removed = status === "removed";
-    const values = {
+    const content = {
       companyId: input.companyId,
       title: input.title,
-      description: input.description,
       category: input.category,
       employmentType: input.employmentType,
       sectors: input.sectors ?? [],
@@ -122,29 +176,54 @@ export async function saveImportedJob(input: ImportedJobWrite) {
       perks: input.perks ?? [],
       ...importedPlace(input),
       timezoneRequired: input.timeZone,
-      applicationMethod: "external_url" as const,
       applicationUrl: input.applyUrl,
-      source: "imported" as const,
       status,
-      publishedAt:
-        status === "published" ? (previous?.publishedAt ?? now) : null,
       expiresAt: input.expiresAt,
-      importedAt: now,
-      createdBy: null,
       riskScore: removed ? 4 : 0,
       riskFlags: removed ? [input.reason] : [],
     };
+    const skillIds = [...new Set(input.skillIds)];
+
+    if (previous) {
+      const unchanged =
+        previous.descriptionMd5 === md5(input.description) &&
+        (Object.keys(content) as (keyof typeof content)[]).every((key) =>
+          same(previous[key], content[key]),
+        );
+      if (unchanged) {
+        const current = await tx
+          .select({ skillId: jobSkills.skillId })
+          .from(jobSkills)
+          .where(eq(jobSkills.jobId, previous.id));
+        const currentIds = new Set(current.map((row) => row.skillId));
+        const skillsSame =
+          currentIds.size === skillIds.length &&
+          skillIds.every((id) => currentIds.has(id));
+        if (skillsSame) return { id: previous.id, status: previous.status };
+      }
+    }
+
+    const values = {
+      ...content,
+      description: input.description,
+      applicationMethod: "external_url" as const,
+      source: "imported" as const,
+      publishedAt:
+        status === "published" ? (previous?.publishedAt ?? now) : null,
+      importedAt: now,
+      createdBy: null,
+    };
+    const saved = { id: jobs.id, status: jobs.status };
     const [job] = previous
       ? await tx
           .update(jobs)
           .set({ ...values, updatedAt: now })
           .where(eq(jobs.id, previous.id))
-          .returning()
-      : await tx.insert(jobs).values(values).returning();
+          .returning(saved)
+      : await tx.insert(jobs).values(values).returning(saved);
     if (!job) throw new Error("Imported job write returned no row");
 
     await tx.delete(jobSkills).where(eq(jobSkills.jobId, job.id));
-    const skillIds = [...new Set(input.skillIds)];
     if (skillIds.length) {
       await tx
         .insert(jobSkills)
