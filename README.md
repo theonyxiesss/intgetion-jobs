@@ -42,7 +42,7 @@ Every request except `GET /health` needs `Authorization: Bearer <JOBS_SERVICE_TO
 | POST | `/v1/team-jobs` | person | Team-plan job from a brief |
 | POST | `/v1/admin/jobs/:id/(approve\|reject\|remove\|republish)` | admin | moderation decisions |
 | POST | `/v1/admin/companies/:id/pause-jobs` | admin | pause a company's published jobs |
-| POST | `/v1/imported-jobs`, `/v1/imported-jobs/expire` | ingestion | write or expire feed jobs |
+| POST | `/v1/imported-jobs`, `/v1/imported-jobs/expire` | ingestion | write or expire feed jobs; `/v1/imported-jobs` returns only `{ id, status }`, not the full job |
 | POST | `/v1/tasks/expire-jobs`, `/v1/tasks/fx-rates`, `/v1/tasks/job-skills`; GET `/v1/tasks/expiring-jobs` | scheduler | expiry, ECB rates, skill backfill, expiring list |
 
 Recruiter = owner, admin or recruiter of the job's company (asked from companies).
